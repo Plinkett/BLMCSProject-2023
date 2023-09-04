@@ -1,20 +1,23 @@
 # Bayesian Learning and Montecarlo Simulation Project
 
 # Group 14: Guerrini Michele                  10607256
-#           Mozzi David"e                      10674709
+#           Mozzi Davide                      10674709
 #           Santillan Moreno Carlos Alberto   10659783
 
 # Dataset 2.8: Covid Data (covidLom2020_21.csv)
+
 
 #### Functions ####
 
 # List of useful functions used in the project
 
-standardize <- function (data) {
+standardize <- function (data, names, centers, scales) {
   new.data <- data
-  for (name in names(data)) {
+  for (name in names) {
     if (is.numeric(data[1, name])) {
-      new.data[[name]] <- scale(data[[name]])
+      new.data[[name]] <- scale(data[[name]],
+                                ifelse(missing(centers), TRUE, centers[[name]]),
+                                ifelse(missing(scales), TRUE, scales[[name]]))
     }
   }
   return (new.data)
@@ -24,7 +27,7 @@ shuffle <- function (data) {
   return (data[sample(seq(1, nrow(data)), nrow(data)),])
 }
 
-test <- function (model, test.data, target.var) {
+mse <- function (model, test.data, target.var) {
   y <- predict(model, test.data)
   if (hasName(y, "fit")) y <- y$fit
   t <- test.data[[target.var]]
@@ -67,22 +70,40 @@ day.to.season <- function (data) {
   return (new.data)
 }
 
+
 #### Data acquisition ####
 
 # Read data from CSV file
 covid.data <- read.csv("covidLom2020_21.csv")
 
+# Remove columns that are never used
+covid.data$X <- NULL
+
 # Set useful constants and parameters
 n         <- nrow(covid.data)
 n.train   <- 180
 
-# Standardize and shuffle the data
-standardized.data <- standardize(covid.data)
-prepared.data <- shuffle(standardized.data)
+# Shuffle the data
+shuffled.data <- shuffle(covid.data)
 
 # Create training and test sets
-training.set <- prepared.data[seq(1, n.train),]
-test.set <- prepared.data[seq(n.train + 1, n),]
+training.set <- shuffled.data[seq(1, n.train),]
+test.set <- shuffled.data[seq(n.train + 1, n),]
+
+# Standardize the data
+# The targets are not standardized. The test set is standardized using the same center and scale values used for the
+# training set.
+to.standardize <- c("newpos", "intcar", "hosp", "newpos_av7D")
+training.set <- standardize(training.set, to.standardize)
+
+centers <- list()
+scales <- list()
+for (name in to.standardize) {
+  centers[[name]] <- attr(training.set[[name]], "scaled:center")
+  scales[[name]] <- attr(training.set[[name]], "scaled:scale")
+}
+
+test.set <- standardize(test.set, to.standardize, centers, scales)
 
 # Transform the "color" categorical variable in several indicator variables
 training.set.cat <- color.to.indicators(training.set)
@@ -98,7 +119,7 @@ covid.1a <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos +
                          modelprior = uniform())
 summary(covid.1a)
 
-test(covid.1a, test.set.cat, "hospH8")
+mse(covid.1a, test.set.cat, "hospH8")
 
 # Show the covariates inclusion probabilities, their values and the marginal posterior distribution of every covariate
 print(covid.1a)
@@ -119,7 +140,7 @@ par(mfrow=c(1,1))
 image(covid.1a, rotate = F)
 
 
-#Same model for intcarH8
+# Same model for intcarH8
 
 covid.1b <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos +
                              intcar + hosp + newpos_av7D,
@@ -127,7 +148,7 @@ covid.1b <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos +
                             modelprior = uniform())
 summary(covid.1b)
 
-test(covid.1b, test.set.cat, "intcarH8")
+mse(covid.1b, test.set.cat, "intcarH8")
 
 # Show the covariates inclusion probabilities, their values and the marginal posterior distribution of every covariate
 print(covid.1a)
