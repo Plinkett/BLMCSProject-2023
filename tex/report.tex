@@ -280,19 +280,23 @@ We then compute our predictions as a weighted average of each model's prediction
 \end{align*}
 The MSE for this aggregate model is 0.01251516, sligthly better than the first model with all the covariates.
 
+
+
 The ranking for the models predicting \textbf{intcarH8} is shown in Figure 8
 \begin{figure}[htb!]
 	\centering
 	\includegraphics[width=100mm, height=60mm,scale=0.5]{ranking2.pdf}
 	\caption{Model ranking for \textbf{intcarH8} }
 \end{figure}
+
+
 For \textbf{intcarH8} the best model has a posterior probability of 65\%, so we could try to use only that one to perform inference. So we choose the model
 \begin{dmath*}
 	\textbf{intcarH8} = \beta_0 + \beta_1\textbf{arancione} +  \beta_2\textbf{intcar} + \beta_3\textbf{newpos\_av7D} + \varepsilon
 \end{dmath*}
-which yields a MSE of 0.04632954\footnote{Note that we judge the improve in terms of the MSE over a large number of shufflings and iterations}, better than the one using all the covariates.
+which yields a MSE of 0.04632954\footnote{Note that we judge the improvement in terms of the MSE over a large number of shufflings and iterations}, better than the one using all the covariates.
 
-We also added a categorical covariate \textbf{season}, as mentioned in the first section. However, it yielded similar slightly worse results in terms of MSE (for \textbf{intcarH8} 0.0495), so we decided to drop it. 
+We also added a categorical covariate \textbf{season}, as mentioned in the first section. However, it yielded slightly worse results in terms of MSE (for \textbf{intcarH8} 0.0495), so we decided to drop it. 
 \newpage
 \section{Posterior analysis}
 \subsection{Posterior distributions }
@@ -351,7 +355,7 @@ Lastly, Table 6 shows the posterior means, standard deviations, and 95\% credibl
 \subsection{Sensitivity analysis}
 Although we chose to be guided completely by the data,  we could still use a g-prior and tune the hyperparameter $\alpha$ by choosing the MSE as the criterion. We use the same models as before, so BMA with \textbf{hospH8} and the model with 3 covariates for \textbf{intcarH8}
 
-In both cases the MSE is high for low values of $\alpha$, around 1 for both targets. However, it decreases until converges to 0.0127 for \textbf{hospH8} and 0.0495 for \textbf{intcarH8}. We settle on $\alpha = 100$. 
+In both cases the MSE is high for low values of $\alpha$, around 1 for both targets. However, it decreases until it converges to 0.0127 for \textbf{hospH8} and 0.0495 for \textbf{intcarH8}. We settle on $\alpha = 100$. 
 
 Since there is no substantial difference in performance we kept setting $\alpha$ to infinity, by using the \texttt{BIC} prior on BAS.
 
