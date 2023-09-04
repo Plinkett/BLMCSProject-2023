@@ -122,4 +122,35 @@ Figure 6 shows the correlation matrix for each region.
 	\includegraphics[width=130mm, height=100mm,scale=0.5]{corrmat2.pdf}
 	\caption{Correlation matrix of the features per region}
 \end{figure}
+Before proceeding, we shuffle and split the dataset in training and test sets with a 87/13 ratio. We also normalize the covariates in the training set, but not the target variables.
+\subsection{Model specification}
+In the Bayesian setting, we use a Gaussian likelihood 
+\begin{align*}
+	y|\beta,\sigma^2,X \sim \mathcal{N}_n(X\beta,\sigma^2I_n)
+\end{align*}
+
+For the prior we initially used default one provided by BAS. BAS uses an approximation of the Zellner-Siow prior 
+
+	\begin{align*}
+	\beta = (\beta_1, \dots, \beta_k)|\sigma^2, \alpha, X &\sim \mathcal{N}_k(0, \alpha\sigma^2(X^TX)^{-1}) \\
+	\sigma^2|X,\alpha &\sim \pi(\sigma^2) = \sigma^{-2} \\
+	1/\alpha &\sim \pi_0 = \Gamma(1/2, n/2)
+\end{align*}
+BAS sets the hyperparameter $\alpha$ to 1. 
+
+We try to predict each target separately and start with \textbf{hostH8}, we consider a model with all the covariates. In particular, \textbf{color} is considered a categorical variable.
+\begin{dmath*}
+	\textbf{hospH8} = \beta_0 + \beta_1\textbf{Gialla} + \beta_2\textbf{Arancione} + \beta_3\textbf{Rossa} + \beta_4\textbf{newpos} + \beta_5\textbf{intcar} + \beta_6\textbf{hosp} + \beta_7\textbf{newpos-av7D} + \varepsilon
+\end{dmath*}
+
+
+
+We transform the \textbf{color} covariate into an ordinal feature starting from 1 (\textit{Bianca}) and ending in 4 (\textit{Rossa}). 
+\newpage
+We must choose a prior, we initially set it to Zellner's G-prior
+	\begin{align*}
+	\beta = (\beta_1,\dots, \beta_k)|\sigma^2 &\sim \mathcal{N}_k(0, \alpha\sigma^2(X^TX)^{-1}) \\
+	(\beta_0, \sigma^2) &\sim \pi(\beta_0, \sigma^2) = \sigma^{-2}
+\end{align*}
+
 \end{document}
