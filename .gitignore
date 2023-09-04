@@ -1,2 +1,7 @@
 .RData
 .Rhistory
+*.aux
+*.log
+*.out
+*.toc
+*.gz
