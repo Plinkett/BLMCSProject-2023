@@ -194,20 +194,26 @@ test.set.cat <- color.to.indicators(test.set)
 # Train and test model 2a (one model for "hospH8" and one for "intcarH8")
 # Note: we can leave out one of the indicator variables (e.g. 'bianca') to get
 # full rank conditions.
-covid.lm.2a.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos +
-                        intcar + hosp,
-                      training.set.cat,
-                      n.models = 1,
-                      include.always = ~ .)
-summary(covid.lm.2a.hosp)
-
-mse(covid.lm.2a.hosp, test.set.cat, "hospH8")
-
-covid.lm.2a.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos +
-                             intcar + hosp,
+covid.lm.2a.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp,
                            training.set.cat,
                            n.models = 1,
                            include.always = ~ .)
+
+coef.2a.hosp <- coef(covid.lm.2a.hosp)
+coef.2a.hosp
+
+summary(covid.lm.2a.hosp)
+
+X11()
+par(mfrow = c(2, 3))
+plot(coef.2a.hosp, subset = 2:7, ask = F)
+
+mse(covid.lm.2a.hosp, test.set.cat, "hospH8")
+
+covid.lm.2a.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp,
+                             training.set.cat,
+                             n.models = 1,
+                             include.always = ~ .)
 summary(covid.lm.2a.intcar)
 
 mse(covid.lm.2a.intcar, test.set.cat, "intcarH8")
@@ -246,24 +252,32 @@ mse(covid.lm.2b.intcar, test.set.num, "intcarH8")
 # Here we let 'bas.lm' test out different models, potentially leaving out some
 # of the covariates
 
-covid.lm.3.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos +
-                       intcar + hosp + newpos_av7D,
-                     training.set.cat)
+covid.lm.3.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                          training.set.cat,
+                          prior = "BIC")
 summary(covid.lm.3.hosp)
+
+image(covid.lm.3.hosp)
 
 mse(covid.lm.3.hosp, test.set.cat, "hospH8")
 
+coef.3.hosp <- coef(covid.lm.3.hosp)
+
 # Show which features are included in the top models selected by 'bas.lm'
-plot(seq(coef(covid.lm.3.hosp)$probne0), coef(covid.lm.3.hosp)$probne0,
+plot(seq(coef.3.hosp$probne0), coef.3.hosp$probne0,
      type = "h",
      lwd = 4,
      xaxt = "n",
      main = "Feature inclusion probabilities",
      xlab = "",
      ylab = "post p(B != 0)")
-axis(1, seq(coef(covid.lm.3.hosp)$probne0), labels = coef(covid.lm.3.hosp)$namesx)
+axis(1, seq(coef.3.hosp$probne0), labels = coef.3.hosp$namesx)
 
-plot(coef(covid.lm.3.hosp), subset = 2:8)
+plot(coef.3.hosp, subset = 2:8)
+
+coef.3.hosp
+
+confint(coef.3.hosp)
 
 print(covid.lm.3.hosp)
 
@@ -271,32 +285,81 @@ image(covid.lm.3.hosp, rotate = F)
 
 # intcarH8
 
-covid.lm.3.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos +
-                            intcar + hosp + newpos_av7D,
-                          training.set.cat)
+covid.lm.3.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                            training.set.cat,
+                            prior = "BIC")
 summary(covid.lm.3.intcar)
+
+image(covid.lm.3.intcar, rotate = F)
 
 mse(covid.lm.3.intcar, test.set.cat, "intcarH8")
 
+coef.3.intcar <- coef(covid.lm.3.intcar)
+
 # Show which features are included in the top models selected by 'bas.lm'
-plot(seq(coef(covid.lm.3.intcar)$probne0), coef(covid.lm.3.intcar)$probne0,
+plot(seq(coef.3.intcar$probne0), coef.3.intcar$probne0,
      type = "h",
      lwd = 4,
      xaxt = "n",
      main = "Feature inclusion probabilities",
      xlab = "",
      ylab = "post p(B != 0)")
-axis(1, seq(coef(covid.lm.3.intcar)$probne0), labels = coef(covid.lm.3.intcar)$namesx)
-
-plot(coef(covid.lm.3.intcar), subset = 2:8)
-
-print(covid.lm.3.intcar)
-
-image(covid.lm.3.intcar, rotate = F)
+axis(1, seq(coef.3.intcar$probne0), labels = coef.3.intcar$namesx)
 
 # The model for intcarH8 cares more about Arancione probably because the number of people in ICU was fundamental in the
 # decision of the color of the zone. The whole point of the Arancione and Rossa zones was to save hospitals from
 # being overcrowded and only secondly to diminish the number of infected people.
+
+# plot(coef.3.intcar, subset = 2:8)
+
+# print(covid.lm.3.intcar)
+
+# image(covid.lm.3.intcar, rotate = F)
+
+# We select the best model:
+
+best <- which.max(covid.lm.3.intcar$logmarg)
+bestmodel <- covid.lm.3.intcar$which[[best]] + 1
+print(bestmodel)
+
+covid.lm.3.intcar <- bas.lm(intcarH8 ~ arancione + intcar + newpos_av7D,
+                            training.set.cat,
+                            prior = "BIC",
+                            bestmodel = rep(1,4),
+                            n.models = 1)
+summary(covid.lm.3.intcar)
+
+coef.3.intcar <- coef(covid.lm.3.intcar)
+coef.3.intcar
+
+par(mfrow=c(2,2))
+plot(coef.3.intcar)
+
+mse(covid.lm.3.intcar, test.set.cat, "intcarH8")
+
+confint(coef.3.intcar)
+
+# TODO: insert comment here
+
+mse.list <- list()
+for(alpha in c(0.001,0.01,0.1,1,10, 30, 40 ,50 , 60, 100, 200, 300, 450, 500, 1000)){
+  covid.lm.3.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                            training.set.cat,
+                            prior="g-prior",
+                            alpha=alpha)
+  mse.list <- append(mse.list, mse(covid.lm.3.hosp, test.set.cat, "hospH8"))
+}
+
+mse.list <- list()
+for(alpha in c(0.001,0.01,0.1,1,10, 30, 40 ,50 , 60, 100, 200, 300, 450, 500, 1000)){
+  covid.lm.3.intcar <- bas.lm(intcarH8 ~ arancione + intcar + newpos_av7D,
+                              training.set.cat,
+                              prior="g-prior",
+                              bestmodel=rep(1,4),
+                              n.models=1,
+                              alpha=alpha)
+  mse.list <- append(mse.list, mse(covid.lm.3.intcar, test.set.cat, "intcarH8"))
+}
 
 #### Model 4 ####
 # "color" is treated as a categorical variable

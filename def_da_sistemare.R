@@ -170,4 +170,4 @@ image(covid.1b, rotate = F)
 
 # The model for intcarH8 cares more about Arancione probably because the number of people in ICU was fundamental in the
 # decision of the color of the zone. The whole point of the Arancione and Rossa zones was to save hospitals from
-# being overcrowded and only secondly to diminish the number of infeted people.
+# being overcrowded and only secondly to diminish the number of infected people.
