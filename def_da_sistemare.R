@@ -6,6 +6,7 @@
 
 # Dataset 2.8: Covid Data (covidLom2020_21.csv)
 
+library(BAS)
 
 #### Functions ####
 
@@ -79,60 +80,26 @@ covid.data <- read.csv("covidLom2020_21.csv")
 covid.data$X <- NULL
 
 # Set useful constants and parameters
-n         <- nrow(covid.data)
-n.train   <- 180
+n <- nrow(covid.data)
+k <- 10  # Number of "folds" in k-fold cross-validation
 
 # Shuffle the data
 shuffled.data <- shuffle(covid.data)
 
-# Create training and test sets
-training.set <- shuffled.data[seq(1, n.train),]
-test.set <- shuffled.data[seq(n.train + 1, n),]
-
 # Standardize the data
-# The targets are not standardized. The test set is standardized using the same center and scale values used for the
-# training set.
+# The targets are not standardized. 
 to.standardize <- c("newpos", "intcar", "hosp", "newpos_av7D")
-training.set <- standardize(training.set, to.standardize)
-
-centers <- list()
-scales <- list()
-for (name in to.standardize) {
-  centers[[name]] <- attr(training.set[[name]], "scaled:center")
-  scales[[name]] <- attr(training.set[[name]], "scaled:scale")
-}
-
-test.set <- standardize(test.set, to.standardize, centers, scales)
+standardized.data <- standardize(shuffled.data, to.standardize)
 
 # Transform the "color" categorical variable in several indicator variables
-training.set.cat <- color.to.indicators(training.set)
-test.set.cat <- color.to.indicators(test.set)
+data.cat <- color.to.indicators(standardized.data)
 
 # Transform the "color" categorical variable in a numerical variable, assuming that
 # "Bianca" < "Gialla" < "Arancione" < "Rossa" and that the value increases linearly
-training.set.num <- color.to.numerical(training.set)
-test.set.num <- color.to.numerical(test.set)
+data.num <- color.to.numerical(standardized.data)
 
 # Extract the "season" categorical value (and conver it into indicator variables) from "day"
-training.set.cat.szn <- day.to.season(training.set.cat)
-test.set.cat.szn <- day.to.season(test.set.cat)
-
-
-#### Variables to collect the results ####
-
-mse.recap.hosp = data.frame(matrix(nrow = 0, ncol = 5))
-colnames(mse.recap.hosp) <- c("Prior",
-                              "Color repr.",
-                              "Season",
-                              "Aggregation",
-                              "MSE")
-
-mse.recap.intcar = data.frame(matrix(nrow = 0, ncol = 5))
-colnames(mse.recap.intcar) <- c("Prior",
-                                "Color repr.",
-                                "Season",
-                                "Aggregation",
-                                "MSE")
+data.cat.szn <- day.to.season(data.cat)
 
 
 #### Testing different priors ####
@@ -143,21 +110,15 @@ colnames(mse.recap.intcar) <- c("Prior",
 # Target: hospH8
 
 lm.ZSnull.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                    training.set.cat,
+                    data.cat,
                     include.always = ~ .,
                     n.models = 1)
 summary(lm.ZSnull.hosp)
 
-mse.recap.hosp["ZS-null prior",] <- c("ZS-null",
-                                      "Categorical",
-                                      "No",
-                                      "Only full model",
-                                      mse(lm.ZSnull.hosp, test.set.cat, "hospH8"))
-
 coef(lm.ZSnull.hosp)
 
 par(mfrow = c(2, 4))
-plot(coef(lm.ZSnull.hosp), ask = FALSE) # TODO: subset = 2:8 ?
+plot(coef(lm.ZSnull.hosp), ask = FALSE)
 par(mfrow = c(1, 1))
 
 plot(confint(coef(lm.ZSnull.hosp)))
@@ -165,16 +126,10 @@ plot(confint(coef(lm.ZSnull.hosp)))
 # Target: intcarH8
 
 lm.ZSnull.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                           training.set.cat,
+                           data.cat,
                            include.always = ~ .,
                            n.models = 1)
 summary(lm.ZSnull.intcar)
-
-mse.recap.intcar["ZS-null prior",] <- c("ZS-null",
-                                        "Categorical",
-                                        "No",
-                                        "Only full model",
-                                        mse(lm.ZSnull.intcar, test.set.cat, "intcarH8"))
 
 coef(lm.ZSnull.intcar)
 
@@ -190,18 +145,12 @@ plot(confint(coef(lm.ZSnull.intcar)))
 # Target: hospH8
 
 lm.gprior.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                         training.set.cat,
+                         data.cat,
                          prior = "g-prior",
                          alpha = 100,
                          include.always = ~ .,
                          n.models = 1)
 summary(lm.gprior.hosp)
-
-mse.recap.hosp["g-prior",] <- c("g-prior",
-                                "Categorical",
-                                "No",
-                                "Only full model",
-                                mse(lm.gprior.hosp, test.set.cat, "hospH8"))
 
 coef(lm.gprior.hosp)
 
@@ -214,18 +163,12 @@ plot(confint(coef(lm.gprior.hosp)))
 # Target: intcarH8
 
 lm.gprior.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                           training.set.cat,
+                           data.cat,
                            prior = "g-prior",
                            alpha = 100,
                            include.always = ~ .,
                            n.models = 1)
 summary(lm.gprior.intcar)
-
-mse.recap.intcar["g-prior",] <- c("g-prior",
-                                  "Categorical",
-                                  "No",
-                                  "Only full model",
-                                  mse(lm.gprior.intcar, test.set.cat, "intcarH8"))
 
 coef(lm.gprior.intcar)
 
@@ -241,7 +184,7 @@ plot(confint(coef(lm.gprior.intcar)))
 # Target: hospH8
 
 lm.bic.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                      training.set.cat,
+                      data.cat,
                       prior = "BIC")
 summary(lm.bic.hosp)
 
@@ -256,21 +199,10 @@ axis(1, seq(coef(lm.bic.hosp)$probne0), labels = coef(lm.bic.hosp)$namesx)
 
 image(lm.bic.hosp, rotate = FALSE)
 
-mse.recap.hosp["Model selection 1",] <- c("Uninf. + BIC",
-                                          "Categorical",
-                                          "No",
-                                          "BMA",
-                                          mse(lm.bic.hosp, test.set.cat, "hospH8", "BMA"))
-mse.recap.hosp["Model selection 2",] <- c("Uninf. + BIC",
-                                          "Categorical",
-                                          "No",
-                                          "HPM",
-                                          mse(lm.bic.hosp, test.set.cat, "hospH8", "HPM"))
-
 # Target: intcarH8
 
 lm.bic.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                      training.set.cat,
+                      data.cat,
                       prior = "BIC")
 summary(lm.bic.intcar)
 
@@ -284,17 +216,6 @@ plot(seq(coef(lm.bic.intcar)$probne0), coef(lm.bic.intcar)$probne0,
 axis(1, seq(coef(lm.bic.intcar)$probne0), labels = coef(lm.bic.intcar)$namesx)
 
 image(lm.bic.intcar, rotate = FALSE)
-
-mse.recap.intcar["Model selection 1",] <- c("Uninf. + BIC",
-                                            "Categorical",
-                                            "No",
-                                            "BMA",
-                                            mse(lm.bic.intcar, test.set.cat, "intcarH8", "BMA"))
-mse.recap.intcar["Model selection 2",] <- c("Uninf. + BIC",
-                                            "Categorical",
-                                            "No",
-                                            "HPM",
-                                            mse(lm.bic.intcar, test.set.cat, "intcarH8", "HPM"))
 
 
 #### Posterior analysis ####
@@ -324,7 +245,7 @@ plot(confint(coef(lm.bic.intcar, estimator = "HPM")))
 # Target: hospH8
 
 lm.numcolor.hosp <- bas.lm(hospH8 ~ color.num + newpos + intcar + hosp + newpos_av7D,
-                      training.set.num,
+                      data.num,
                       prior = "BIC")
 summary(lm.numcolor.hosp)
 
@@ -339,16 +260,10 @@ axis(1, seq(coef(lm.numcolor.hosp)$probne0), labels = coef(lm.numcolor.hosp)$nam
 
 image(lm.numcolor.hosp, rotate = FALSE)
 
-mse.recap.hosp["Numerical color",] <- c("Uninf. + BIC",
-                                        "Ordinal",
-                                        "No",
-                                        "BMA",
-                                        mse(lm.numcolor.hosp, test.set.num, "hospH8"))
-
 # Target: intcarH8
 
 lm.numcolor.intcar <- bas.lm(intcarH8 ~ color.num + newpos + intcar + hosp + newpos_av7D,
-                           training.set.num,
+                           data.num,
                            prior = "BIC")
 summary(lm.numcolor.intcar)
 
@@ -363,12 +278,6 @@ axis(1, seq(coef(lm.numcolor.intcar)$probne0), labels = coef(lm.numcolor.intcar)
 
 image(lm.numcolor.intcar, rotate = FALSE)
 
-mse.recap.intcar["Numerical color",] <- c("Uninf. + BIC",
-                                          "Ordinal",
-                                          "No",
-                                          "BMA",
-                                          mse(lm.numcolor.intcar, test.set.num, "intcarH8"))
-
 ## Season categorical variable (derived from day)
 
 # Note: we can for sure ignore the "autumn" indicator variable since in our data it's always 0.
@@ -377,7 +286,7 @@ mse.recap.intcar["Numerical color",] <- c("Uninf. + BIC",
 # Target: hospH8
 
 lm.szn.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D + winter + summer,
-                      training.set.cat.szn,
+                      data.cat.szn,
                       prior = "BIC")
 summary(lm.szn.hosp)
 
@@ -392,16 +301,10 @@ axis(1, seq(coef(lm.szn.hosp)$probne0), labels = coef(lm.szn.hosp)$namesx)
 
 image(lm.szn.hosp, rotate = FALSE)
 
-mse.recap.hosp["With season",] <- c("Uninf. + BIC",
-                                     "Categorical",
-                                     "Yes",
-                                     "BMA",
-                                     mse(lm.szn.hosp, test.set.cat.szn, "hospH8"))
-
 # Target: intcarH8
 
 lm.szn.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D + winter + summer,
-                      training.set.cat.szn,
+                      data.cat.szn,
                       prior = "BIC")
 summary(lm.szn.intcar)
 
@@ -416,61 +319,177 @@ axis(1, seq(coef(lm.szn.intcar)$probne0), labels = coef(lm.szn.intcar)$namesx)
 
 image(lm.szn.intcar, rotate = FALSE)
 
-mse.recap.intcar["With season",] <- c("Uninf. + BIC",
-                                       "Categorical",
-                                       "Yes",
-                                       "BMA",
-                                       mse(lm.szn.intcar, test.set.cat.szn, "intcarH8"))
-
 
 #### Appendix: comparison wiht frequentist linear regression ####
 
-# TODO: check this part
+# # TODO: check this part
+# 
+# # MSE for freq
+# 
+# mse_freq <- function (model, test.data, target.var) {
+#   y <- predict(model, test.data)
+#   t <- test.data[[target.var]]
+#   return (mean((t - y)^2))
+# }
+# 
+# # Fitting model for intcarH8
+# 
+# freq.intcar <- lm(intcarH8 ~ arancione + intcar + newpos_av7D, data=training.set.cat)
+# 
+# 
+# # Normality test
+# shapiro.test(residuals(freq.intcar))
+# summary(freq.intcar)
+# 
+# # Diagnostics
+# 
+# 
+# # Fitting best bayesian model for intcarH8
+# par(mfrow = c(2,1))
+# plot(freq.intcar)
+# 
+# # Now hospH8
+# 
+# 
+# freq.hospH8 <- lm(hospH8 ~ rossa + hosp + newpos_av7D, data=training.set.cat)
+# 
+# # Normality test
+# shapiro.test(residuals(freq.hospH8))
+# summary(freq.hospH8)
+# 
+# # Diagnostics
+# 
+# 
+# # Fitting best bayesian model for hospH8
+# par(mfrow = c(2,1))
+# plot(freq.hospH8)
+# 
+# mse_freq(freq.hospH8, test.set.cat, 'hospH8')
 
-# MSE for freq
 
-mse_freq <- function (model, test.data, target.var) {
-  y <- predict(model, test.data)
-  t <- test.data[[target.var]]
-  return (mean((t - y)^2))
+#### Cross-validation ####
+
+mse.ZSnull.hosp <- numeric(k)
+mse.ZSnull.intcar <- numeric(k)
+mse.g.hosp <- numeric(k)
+mse.g.intcar <- numeric(k)
+mse.bic.bma.hosp <- numeric(k)
+mse.bic.hpm.hosp <- numeric(k)
+mse.bic.bma.intcar <- numeric(k)
+mse.bic.hpm.intcar <- numeric(k)
+mse.numcolor.hosp <- numeric(k)
+mse.numcolor.intcar <- numeric(k)
+mse.szn.hosp <- numeric(k)
+mse.szn.intcar <- numeric(k)
+
+idx <- 1
+n.val <- n %/% k
+for (i in 1:k) {
+  test.seq <- seq(idx, idx + n.val - 1)
+  idx <- idx + n.val
+  if (i == k - n %% k) n.val <- n.val + 1
+  
+  training.set <- shuffled.data[-test.seq,]
+  validation.set <- shuffled.data[test.seq,]
+  
+  # Standardize the training and validation sets
+  # The validation set is standardized using the same center and scale values used for the training set.
+  
+  training.set <- standardize(training.set, to.standardize)
+  centers <- list()
+  scales <- list()
+  for (name in to.standardize) {
+    centers[[name]] <- attr(training.set[[name]], "scaled:center")
+    scales[[name]] <- attr(training.set[[name]], "scaled:scale")
+  }
+  validation.set <- standardize(validation.set, to.standardize, centers, scales)
+  
+  # Transform the "color" categorical variable in several indicator variables
+  training.set.cat <- color.to.indicators(training.set)
+  validation.set.cat <- color.to.indicators(validation.set)
+  
+  # Transform the "color" categorical variable in a numerical variable, assuming that
+  # "Bianca" < "Gialla" < "Arancione" < "Rossa" and that the value increases linearly
+  training.set.num <- color.to.numerical(training.set)
+  validation.set.num <- color.to.numerical(validation.set)
+  
+  # Extract the "season" categorical value (and conver it into indicator variables) from "day"
+  training.set.cat.szn <- day.to.season(training.set.cat)
+  validation.set.cat.szn <- day.to.season(validation.set.cat)
+  
+  # Train the models and compute the Mean Square Errors
+  
+  lm.ZSnull.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                           training.set.cat,
+                           include.always = ~ .,
+                           n.models = 1)
+  mse.ZSnull.hosp[i] <- mse(lm.ZSnull.hosp, validation.set.cat, "hospH8")
+  
+  lm.ZSnull.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                             training.set.cat,
+                             include.always = ~ .,
+                             n.models = 1)
+  mse.ZSnull.intcar[i] <- mse(lm.ZSnull.intcar, validation.set.cat, "intcarH8")
+  
+  lm.gprior.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                           training.set.cat,
+                           prior = "g-prior",
+                           alpha = 100,
+                           include.always = ~ .,
+                           n.models = 1)
+  mse.g.hosp[i] <- mse(lm.gprior.hosp, validation.set.cat, "hospH8")
+  
+  lm.gprior.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                             training.set.cat,
+                             prior = "g-prior",
+                             alpha = 100,
+                             include.always = ~ .,
+                             n.models = 1)
+  mse.g.intcar[i] <- mse(lm.gprior.intcar, validation.set.cat, "intcarH8")
+  
+  lm.bic.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                        training.set.cat,
+                        prior = "BIC")
+  mse.bic.bma.hosp[i] <- mse(lm.bic.hosp, validation.set.cat, "hospH8", "BMA")
+  mse.bic.hpm.hosp[i] <- mse(lm.bic.hosp, validation.set.cat, "hospH8", "HPM")
+  
+  lm.bic.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                          training.set.cat,
+                          prior = "BIC")
+  mse.bic.bma.intcar[i] <- mse(lm.bic.intcar, validation.set.cat, "intcarH8", "BMA")
+  mse.bic.hpm.intcar[i] <- mse(lm.bic.intcar, validation.set.cat, "intcarH8", "HPM")
+  
+  lm.numcolor.hosp <- bas.lm(hospH8 ~ color.num + newpos + intcar + hosp + newpos_av7D,
+                             training.set.num,
+                             prior = "BIC")
+  mse.numcolor.hosp[i] <- mse(lm.numcolor.hosp, validation.set.num, "hospH8")
+  
+  lm.numcolor.intcar <- bas.lm(intcarH8 ~ color.num + newpos + intcar + hosp + newpos_av7D,
+                               training.set.num,
+                               prior = "BIC")
+  mse.numcolor.intcar[i] <- mse(lm.numcolor.intcar, validation.set.num, "intcarH8")
+  
+  lm.szn.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D + winter + summer,
+                        training.set.cat.szn,
+                        prior = "BIC")
+  mse.szn.hosp[i] <- mse(lm.szn.hosp, validation.set.cat.szn, "hospH8")
+  
+  lm.szn.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D + winter + summer,
+                          training.set.cat.szn,
+                          prior = "BIC")
+  mse.szn.intcar[i] <- mse(lm.szn.intcar, validation.set.cat.szn, "intcarH8")
 }
 
-# Fitting model for intcarH8
+mean(mse.ZSnull.hosp)
+mean(mse.g.hosp)
+mean(mse.bic.bma.hosp)
+mean(mse.bic.hpm.hosp)
+mean(mse.numcolor.hosp)
+mean(mse.szn.hosp)
 
-freq.intcar <- lm(intcarH8 ~ arancione + intcar + newpos_av7D, data=training.set.cat)
-
-
-# Normality test
-shapiro.test(residuals(freq.intcar))
-summary(freq.intcar)
-
-# Diagnostics
-
-
-# Fitting best bayesian model for intcarH8
-par(mfrow = c(2,1))
-plot(freq.intcar)
-
-# Now hospH8
-
-
-freq.hospH8 <- lm(hospH8 ~ rossa + hosp + newpos_av7D, data=training.set.cat)
-
-# Normality test
-shapiro.test(residuals(freq.hospH8))
-summary(freq.hospH8)
-
-# Diagnostics
-
-
-# Fitting best bayesian model for hospH8
-par(mfrow = c(2,1))
-plot(freq.hospH8)
-
-mse_freq(freq.hospH8, test.set.cat, 'hospH8')
-
-
-#### Conclusions ####
-
-mse.recap.hosp
-mse.recap.intcar
+mean(mse.ZSnull.intcar)
+mean(mse.g.intcar)
+mean(mse.bic.bma.intcar)
+mean(mse.bic.hpm.intcar)
+mean(mse.numcolor.intcar)
+mean(mse.szn.intcar)
