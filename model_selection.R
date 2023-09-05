@@ -6,8 +6,8 @@ library(BAS)
 # [x] Do not standardize targets
 # [ ] Try "splitting" some covariates and combining them with others
 #     (e.g. intcar.bianca, intcar.gialla, ...)
-# [ ] Try different priors
-# [ ] Sensitivity analysis on prior parameters
+# [x] Try different priors
+# [x] Sensitivity analysis on prior parameters
 
 #### Functions ####
 
@@ -204,7 +204,7 @@ coef.2a.hosp
 
 summary(covid.lm.2a.hosp)
 
-X11()
+# X11()
 par(mfrow = c(2, 3))
 plot(coef.2a.hosp, subset = 2:7, ask = F)
 

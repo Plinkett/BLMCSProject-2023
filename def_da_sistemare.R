@@ -27,8 +27,8 @@ shuffle <- function (data) {
   return (data[sample(seq(1, nrow(data)), nrow(data)),])
 }
 
-mse <- function (model, test.data, target.var) {
-  y <- predict(model, test.data)
+mse <- function (model, test.data, target.var, estimator = "BMA") {
+  y <- predict(model, test.data, estimator = estimator)
   if (hasName(y, "fit")) y <- y$fit
   t <- test.data[[target.var]]
   return (mean((t - y)^2))
@@ -109,65 +109,160 @@ test.set <- standardize(test.set, to.standardize, centers, scales)
 training.set.cat <- color.to.indicators(training.set)
 test.set.cat <- color.to.indicators(test.set)
 
+# Transform the "color" categorical variable in a numerical variable, assuming that
+# "Bianca" < "Gialla" < "Arancione" < "Rossa" and that the value increases linearly.
+training.set.num <- color.to.numerical(training.set)
+test.set.num <- color.to.numerical(test.set)
 
-#### Model 1 ####
 
-# First model for the target hospH8
-covid.1a <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos +
-                           intcar + hosp + newpos_av7D,
-                         data = training.set.cat,
-                         modelprior = uniform())
-summary(covid.1a)
+#### Testing different priors ####
+# Note: here we are training only the full model each time (the one with all the covariates).
 
-mse(covid.1a, test.set.cat, "hospH8")
+## Default prior of the BAS library ("ZS-null"), which is an approximation of the Zellner-Siow prior
 
-# Show the covariates inclusion probabilities, their values and the marginal posterior distribution of every covariate
-print(covid.1a)
-par(mfrow=c(2,4))
-plot(seq(coef(covid.1a)$probne0), coef(covid.1a)$probne0,
+# Target: hospH8
+
+lm.ZSnull.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                    training.set.cat,
+                    include.always = ~ .,
+                    n.models = 1)
+summary(lm.ZSnull.hosp)
+
+mse(lm.ZSnull.hosp, test.set.cat, "hospH8")
+
+coef(lm.ZSnull.hosp)
+
+par(mfrow = c(2, 4))
+plot(coef(lm.ZSnull.hosp), ask = FALSE) # TODO: subset = 2:8 ?
+par(mfrow = c(1, 1))
+
+plot(confint(coef(lm.ZSnull.hosp)))
+
+# Target: intcarH8
+
+lm.ZSnull.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                           training.set.cat,
+                           include.always = ~ .,
+                           n.models = 1)
+summary(lm.ZSnull.intcar)
+
+mse(lm.ZSnull.intcar, test.set.cat, "intcarH8")
+
+coef(lm.ZSnull.intcar)
+
+par(mfrow = c(2, 4))
+plot(coef(lm.ZSnull.intcar), ask = FALSE)
+par(mfrow = c(1, 1))
+
+plot(confint(coef(lm.ZSnull.intcar)))
+
+
+## Zellner's informative g-prior
+
+# Target: hospH8
+
+lm.gprior.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                         training.set.cat,
+                         prior = "g-prior",
+                         alpha = 100,
+                         include.always = ~ .,
+                         n.models = 1)
+summary(lm.gprior.hosp)
+
+mse(lm.gprior.hosp, test.set.cat, "hospH8")
+
+coef(lm.gprior.hosp)
+
+par(mfrow = c(2, 4))
+plot(coef(lm.gprior.hosp), ask = FALSE) # TODO: subset = 2:8 ?
+par(mfrow = c(1, 1))
+
+plot(confint(coef(lm.gprior.hosp)))
+
+# Target: intcarH8
+
+lm.gprior.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                           training.set.cat,
+                           prior = "g-prior",
+                           alpha = 100,
+                           include.always = ~ .,
+                           n.models = 1)
+summary(lm.gprior.intcar)
+
+mse(lm.gprior.intcar, test.set.cat, "intcarH8")
+
+coef(lm.gprior.intcar)
+
+par(mfrow = c(2, 4))
+plot(coef(lm.gprior.intcar), ask = FALSE)
+par(mfrow = c(1, 1))
+
+plot(confint(coef(lm.gprior.intcar)))
+
+
+#### Model selection using BIC
+
+# Target: hospH8
+
+lm.bic.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                      training.set.cat,
+                      prior = "BIC")
+summary(lm.bic.hosp)
+
+plot(seq(coef(lm.bic.hosp)$probne0), coef(lm.bic.hosp)$probne0,
      type = "h",
      lwd = 4,
      xaxt = "n",
-     main = "Covariates inclusion probabilities",
+     main = "Feature inclusion probabilities",
      xlab = "",
      ylab = "post p(B != 0)")
-axis(1, seq(coef(covid.1a)$probne0), labels = coef(covid.1a)$namesx)
+axis(1, seq(coef(lm.bic.hosp)$probne0), labels = coef(lm.bic.hosp)$namesx)
 
-plot(coef(covid.1a), subset = 2:8)
+image(lm.bic.hosp, rotate = FALSE)
 
-# Show which model includes which covariate 
-par(mfrow=c(1,1))
-image(covid.1a, rotate = F)
+par(mfrow = c(2, 4))
+plot(coef(lm.bic.hosp), ask = FALSE)
+par(mfrow = c(1, 1))
 
+mse(lm.bic.hosp, test.set.cat, "hospH8", "BMA")
+mse(lm.bic.hosp, test.set.cat, "hospH8", "HPM")
 
-# Same model for intcarH8
+lm.best.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                      training.set.cat,
+                      prior = "BIC")
 
-covid.1b <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos +
-                             intcar + hosp + newpos_av7D,
-                            data = training.set.cat,
-                            modelprior = uniform())
-summary(covid.1b)
+# Target: intcarH8
 
-mse(covid.1b, test.set.cat, "intcarH8")
+lm.bic.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
+                      training.set.cat,
+                      prior = "BIC")
+summary(lm.bic.intcar)
 
-# Show the covariates inclusion probabilities, their values and the marginal posterior distribution of every covariate
-print(covid.1a)
-par(mfrow=c(2,4))
-plot(seq(coef(covid.1b)$probne0), coef(covid.1b)$probne0,
+plot(seq(coef(lm.bic.intcar)$probne0), coef(lm.bic.intcar)$probne0,
      type = "h",
      lwd = 4,
      xaxt = "n",
-     main = "Covariate inclusion probabilities",
+     main = "Feature inclusion probabilities",
      xlab = "",
      ylab = "post p(B != 0)")
-axis(1, seq(coef(covid.1b)$probne0), labels = coef(covid.1b)$namesx)
+axis(1, seq(coef(lm.bic.intcar)$probne0), labels = coef(lm.bic.intcar)$namesx)
 
-plot(coef(covid.1a), subset = 2:8)
+image(lm.bic.intcar, rotate = FALSE)
 
-# Show which model includes which covariate 
-par(mfrow=c(1,1))
-image(covid.1b, rotate = F)
+par(mfrow = c(2, 4))
+plot(coef(lm.bic.intcar), ask = FALSE)
+par(mfrow = c(1, 1))
 
-# The model for intcarH8 cares more about Arancione probably because the number of people in ICU was fundamental in the
-# decision of the color of the zone. The whole point of the Arancione and Rossa zones was to save hospitals from
-# being overcrowded and only secondly to diminish the number of infected people.
+mse(lm.bic.intcar, test.set.cat, "intcarH8", "BMA")
+mse(lm.bic.intcar, test.set.cat, "intcarH8", "HPM")
+
+
+#### Appendix: different representations for some of the covariates ####
+
+## Color as a numerical variable
+
+# TODO
+
+## Season categorical variable (derived from day)
+
+# TODO
