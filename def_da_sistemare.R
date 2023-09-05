@@ -28,8 +28,7 @@ shuffle <- function (data) {
 }
 
 mse <- function (model, test.data, target.var, estimator = "BMA") {
-  y <- predict(model, test.data, estimator = estimator)
-  if (hasName(y, "fit")) y <- y$fit
+  y <- predict(model, test.data, estimator = estimator)$fit
   t <- test.data[[target.var]]
   return (mean((t - y)^2))
 }
@@ -110,9 +109,30 @@ training.set.cat <- color.to.indicators(training.set)
 test.set.cat <- color.to.indicators(test.set)
 
 # Transform the "color" categorical variable in a numerical variable, assuming that
-# "Bianca" < "Gialla" < "Arancione" < "Rossa" and that the value increases linearly.
+# "Bianca" < "Gialla" < "Arancione" < "Rossa" and that the value increases linearly
 training.set.num <- color.to.numerical(training.set)
 test.set.num <- color.to.numerical(test.set)
+
+# Extract the "season" categorical value (and conver it into indicator variables) from "day"
+training.set.cat.szn <- day.to.season(training.set.cat)
+test.set.cat.szn <- day.to.season(test.set.cat)
+
+
+#### Variables to collect the results ####
+
+mse.recap.hosp = data.frame(matrix(nrow = 0, ncol = 5))
+colnames(mse.recap.hosp) <- c("Prior",
+                              "Color repr.",
+                              "Season",
+                              "Aggregation",
+                              "MSE")
+
+mse.recap.intcar = data.frame(matrix(nrow = 0, ncol = 5))
+colnames(mse.recap.intcar) <- c("Prior",
+                                "Color repr.",
+                                "Season",
+                                "Aggregation",
+                                "MSE")
 
 
 #### Testing different priors ####
@@ -128,7 +148,11 @@ lm.ZSnull.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar +
                     n.models = 1)
 summary(lm.ZSnull.hosp)
 
-mse(lm.ZSnull.hosp, test.set.cat, "hospH8")
+mse.recap.hosp["ZS-null prior",] <- c("ZS-null",
+                                      "Categorical",
+                                      "No",
+                                      "Only full model",
+                                      mse(lm.ZSnull.hosp, test.set.cat, "hospH8"))
 
 coef(lm.ZSnull.hosp)
 
@@ -146,7 +170,11 @@ lm.ZSnull.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intc
                            n.models = 1)
 summary(lm.ZSnull.intcar)
 
-mse(lm.ZSnull.intcar, test.set.cat, "intcarH8")
+mse.recap.intcar["ZS-null prior",] <- c("ZS-null",
+                                        "Categorical",
+                                        "No",
+                                        "Only full model",
+                                        mse(lm.ZSnull.intcar, test.set.cat, "intcarH8"))
 
 coef(lm.ZSnull.intcar)
 
@@ -169,7 +197,11 @@ lm.gprior.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar +
                          n.models = 1)
 summary(lm.gprior.hosp)
 
-mse(lm.gprior.hosp, test.set.cat, "hospH8")
+mse.recap.hosp["g-prior",] <- c("g-prior",
+                                "Categorical",
+                                "No",
+                                "Only full model",
+                                mse(lm.gprior.hosp, test.set.cat, "hospH8"))
 
 coef(lm.gprior.hosp)
 
@@ -189,7 +221,11 @@ lm.gprior.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intc
                            n.models = 1)
 summary(lm.gprior.intcar)
 
-mse(lm.gprior.intcar, test.set.cat, "intcarH8")
+mse.recap.intcar["g-prior",] <- c("g-prior",
+                                  "Categorical",
+                                  "No",
+                                  "Only full model",
+                                  mse(lm.gprior.intcar, test.set.cat, "intcarH8"))
 
 coef(lm.gprior.intcar)
 
@@ -200,7 +236,7 @@ par(mfrow = c(1, 1))
 plot(confint(coef(lm.gprior.intcar)))
 
 
-#### Model selection using BIC
+#### Model selection using BIC ####
 
 # Target: hospH8
 
@@ -220,16 +256,16 @@ axis(1, seq(coef(lm.bic.hosp)$probne0), labels = coef(lm.bic.hosp)$namesx)
 
 image(lm.bic.hosp, rotate = FALSE)
 
-par(mfrow = c(2, 4))
-plot(coef(lm.bic.hosp), ask = FALSE)
-par(mfrow = c(1, 1))
-
-mse(lm.bic.hosp, test.set.cat, "hospH8", "BMA")
-mse(lm.bic.hosp, test.set.cat, "hospH8", "HPM")
-
-lm.best.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D,
-                      training.set.cat,
-                      prior = "BIC")
+mse.recap.hosp["Model selection 1",] <- c("Uninf. + BIC",
+                                          "Categorical",
+                                          "No",
+                                          "BMA",
+                                          mse(lm.bic.hosp, test.set.cat, "hospH8", "BMA"))
+mse.recap.hosp["Model selection 2",] <- c("Uninf. + BIC",
+                                          "Categorical",
+                                          "No",
+                                          "HPM",
+                                          mse(lm.bic.hosp, test.set.cat, "hospH8", "HPM"))
 
 # Target: intcarH8
 
@@ -249,20 +285,192 @@ axis(1, seq(coef(lm.bic.intcar)$probne0), labels = coef(lm.bic.intcar)$namesx)
 
 image(lm.bic.intcar, rotate = FALSE)
 
+mse.recap.intcar["Model selection 1",] <- c("Uninf. + BIC",
+                                            "Categorical",
+                                            "No",
+                                            "BMA",
+                                            mse(lm.bic.intcar, test.set.cat, "intcarH8", "BMA"))
+mse.recap.intcar["Model selection 2",] <- c("Uninf. + BIC",
+                                            "Categorical",
+                                            "No",
+                                            "HPM",
+                                            mse(lm.bic.intcar, test.set.cat, "intcarH8", "HPM"))
+
+
+#### Posterior analysis ####
+# Here we analyze the models trained in the model selection paragraph
+
+# Target: hospH8 (using BMA)
+
 par(mfrow = c(2, 4))
-plot(coef(lm.bic.intcar), ask = FALSE)
+plot(coef(lm.bic.hosp), ask = FALSE)
 par(mfrow = c(1, 1))
 
-mse(lm.bic.intcar, test.set.cat, "intcarH8", "BMA")
-mse(lm.bic.intcar, test.set.cat, "intcarH8", "HPM")
+plot(confint(coef(lm.bic.hosp)))
+
+# Target: intcarH8 (using HPM)
+
+par(mfrow = c(2, 4))
+plot(coef(lm.bic.intcar, estimator = "HPM"), ask = FALSE)
+par(mfrow = c(1, 1))
+
+plot(confint(coef(lm.bic.intcar, estimator = "HPM")))
 
 
 #### Appendix: different representations for some of the covariates ####
 
 ## Color as a numerical variable
 
-# TODO
+# Target: hospH8
+
+lm.numcolor.hosp <- bas.lm(hospH8 ~ color.num + newpos + intcar + hosp + newpos_av7D,
+                      training.set.num,
+                      prior = "BIC")
+summary(lm.numcolor.hosp)
+
+plot(seq(coef(lm.numcolor.hosp)$probne0), coef(lm.numcolor.hosp)$probne0,
+     type = "h",
+     lwd = 4,
+     xaxt = "n",
+     main = "Feature inclusion probabilities",
+     xlab = "",
+     ylab = "post p(B != 0)")
+axis(1, seq(coef(lm.numcolor.hosp)$probne0), labels = coef(lm.numcolor.hosp)$namesx)
+
+image(lm.numcolor.hosp, rotate = FALSE)
+
+mse.recap.hosp["Numerical color",] <- c("Uninf. + BIC",
+                                        "Ordinal",
+                                        "No",
+                                        "BMA",
+                                        mse(lm.numcolor.hosp, test.set.num, "hospH8"))
+
+# Target: intcarH8
+
+lm.numcolor.intcar <- bas.lm(intcarH8 ~ color.num + newpos + intcar + hosp + newpos_av7D,
+                           training.set.num,
+                           prior = "BIC")
+summary(lm.numcolor.intcar)
+
+plot(seq(coef(lm.numcolor.intcar)$probne0), coef(lm.numcolor.intcar)$probne0,
+     type = "h",
+     lwd = 4,
+     xaxt = "n",
+     main = "Feature inclusion probabilities",
+     xlab = "",
+     ylab = "post p(B != 0)")
+axis(1, seq(coef(lm.numcolor.intcar)$probne0), labels = coef(lm.numcolor.intcar)$namesx)
+
+image(lm.numcolor.intcar, rotate = FALSE)
+
+mse.recap.intcar["Numerical color",] <- c("Uninf. + BIC",
+                                          "Ordinal",
+                                          "No",
+                                          "BMA",
+                                          mse(lm.numcolor.intcar, test.set.num, "intcarH8"))
 
 ## Season categorical variable (derived from day)
 
-# TODO
+# Note: we can for sure ignore the "autumn" indicator variable since in our data it's always 0.
+# Then we can remove one of the remaining three in order to get independent conditions.
+
+# Target: hospH8
+
+lm.szn.hosp <- bas.lm(hospH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D + winter + summer,
+                      training.set.cat.szn,
+                      prior = "BIC")
+summary(lm.szn.hosp)
+
+plot(seq(coef(lm.szn.hosp)$probne0), coef(lm.szn.hosp)$probne0,
+     type = "h",
+     lwd = 4,
+     xaxt = "n",
+     main = "Feature inclusion probabilities",
+     xlab = "",
+     ylab = "post p(B != 0)")
+axis(1, seq(coef(lm.szn.hosp)$probne0), labels = coef(lm.szn.hosp)$namesx)
+
+image(lm.szn.hosp, rotate = FALSE)
+
+mse.recap.hosp["With season",] <- c("Uninf. + BIC",
+                                     "Categorical",
+                                     "Yes",
+                                     "BMA",
+                                     mse(lm.szn.hosp, test.set.cat.szn, "hospH8"))
+
+# Target: intcarH8
+
+lm.szn.intcar <- bas.lm(intcarH8 ~ gialla + arancione + rossa + newpos + intcar + hosp + newpos_av7D + winter + summer,
+                      training.set.cat.szn,
+                      prior = "BIC")
+summary(lm.szn.intcar)
+
+plot(seq(coef(lm.szn.intcar)$probne0), coef(lm.szn.intcar)$probne0,
+     type = "h",
+     lwd = 4,
+     xaxt = "n",
+     main = "Feature inclusion probabilities",
+     xlab = "",
+     ylab = "post p(B != 0)")
+axis(1, seq(coef(lm.szn.intcar)$probne0), labels = coef(lm.szn.intcar)$namesx)
+
+image(lm.szn.intcar, rotate = FALSE)
+
+mse.recap.intcar["With season",] <- c("Uninf. + BIC",
+                                       "Categorical",
+                                       "Yes",
+                                       "BMA",
+                                       mse(lm.szn.intcar, test.set.cat.szn, "intcarH8"))
+
+
+#### Appendix: comparison wiht frequentist linear regression ####
+
+# TODO: check this part
+
+# MSE for freq
+
+mse_freq <- function (model, test.data, target.var) {
+  y <- predict(model, test.data)
+  t <- test.data[[target.var]]
+  return (mean((t - y)^2))
+}
+
+# Fitting model for intcarH8
+
+freq.intcar <- lm(intcarH8 ~ arancione + intcar + newpos_av7D, data=training.set.cat)
+
+
+# Normality test
+shapiro.test(residuals(freq.intcar))
+summary(freq.intcar)
+
+# Diagnostics
+
+
+# Fitting best bayesian model for intcarH8
+par(mfrow = c(2,1))
+plot(freq.intcar)
+
+# Now hospH8
+
+
+freq.hospH8 <- lm(hospH8 ~ rossa + hosp + newpos_av7D, data=training.set.cat)
+
+# Normality test
+shapiro.test(residuals(freq.hospH8))
+summary(freq.hospH8)
+
+# Diagnostics
+
+
+# Fitting best bayesian model for hospH8
+par(mfrow = c(2,1))
+plot(freq.hospH8)
+
+mse_freq(freq.hospH8, test.set.cat, 'hospH8')
+
+
+#### Conclusions ####
+
+mse.recap.hosp
+mse.recap.intcar
